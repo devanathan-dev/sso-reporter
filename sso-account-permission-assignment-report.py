@@ -27,6 +27,7 @@ def list_accounts():
         for acct in page['Accounts']:
             # only add active accounts
             if acct['Status'] == 'ACTIVE':
+                print(acct['Name'])
                 account_list.append({'name': acct['Name'], 'id': acct['Id']})
 
     return account_list
@@ -83,7 +84,26 @@ def list_permission_sets(ssoInstanceArn):
 
     return perm_set_dict
 
+def list_permission_sets_provisioned_to_account(ssoInstanceArn,ssoAccountId):
+    client = boto3.client('sso-admin')
 
+    perm_set_dict = {}
+
+    response = client.list_permission_sets_provisioned_to_account(InstanceArn=ssoInstanceArn,AccountId=ssoAccountId)
+
+    results = response["PermissionSets"]
+    while "NextToken" in response:
+        response = client.list_permission_sets_provisioned_to_account(InstanceArn=ssoInstanceArn,AccountId=ssoAccountId, NextToken=response["NextToken"])
+        results.extend(response["PermissionSets"])
+
+    for permission_set in results:
+        # get the name of the permission set from the arn
+        perm_description = client.describe_permission_set(InstanceArn=ssoInstanceArn,PermissionSetArn=permission_set)
+        # key: permission set name, value: permission set arn
+        perm_set_dict[perm_description["PermissionSet"]["Name"]] = permission_set
+
+
+    return perm_set_dict
 """
 list_account_assignments
 
@@ -174,7 +194,7 @@ Parameters:
 Returns:
 -- List[Dictionary]: result (a list of dictionaries with keys 'AccountID', 'AccountName', 'PermissionSet', 'ObjectName', 'ObjectType')
 """
-def create_report(account_list, sso_instance, permission_sets_list, break_after=None):
+def create_report(account_list, sso_instance, break_after=None):
     result = []
 
     # variables for displaying the progress of processed accounts
@@ -182,8 +202,11 @@ def create_report(account_list, sso_instance, permission_sets_list, break_after=
     i = 1
 
     for account in account_list:
+        permission_sets_list = list_permission_sets_provisioned_to_account(sso_instance['instanceArn'], account['id'])
         for permission_set in permission_sets_list.keys():
             # get all the users assigned to a permission set on the current account
+            
+            
             account_assignments = list_account_assignments(sso_instance['instanceArn'], account['id'], permission_sets_list[permission_set])
 
             # add the users and additional information to the sso report result
@@ -272,8 +295,8 @@ def main():
     start = time.time()
     account_list = list_accounts()
     sso_instance = list_existing_sso_instances()[0]
-    permission_sets_list = list_permission_sets(sso_instance['instanceArn'])
-    result = create_report(account_list, sso_instance, permission_sets_list)
+    # permission_sets_list = list_permission_sets(sso_instance['instanceArn'])
+    result = create_report(account_list, sso_instance)
     write_result_to_file(result)
 
     # print the time it took to generate the report
