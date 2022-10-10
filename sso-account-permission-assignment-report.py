@@ -27,7 +27,6 @@ def list_accounts():
         for acct in page['Accounts']:
             # only add active accounts
             if acct['Status'] == 'ACTIVE':
-                print(acct['Name'])
                 account_list.append({'name': acct['Name'], 'id': acct['Id']})
 
     return account_list
@@ -231,7 +230,7 @@ def create_report(account_list, sso_instance, break_after=None):
                 result.append(account_assignments_dic)
 
         # display the progress of processed accounts
-        print(str(i) + "/" + length + " accounts done")
+        print(str(i) + "/" + length + " ("+account['name'] +") accounts done")
         i = i+1
 
         # debug code used for stopping after a certain amound of accounts for faster testing
